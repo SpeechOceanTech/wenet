@@ -12,8 +12,10 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 import logging
 from contextlib import nullcontext
+from wenet.utils.checkpoint import save_checkpoint, remove_checkpoint
 
 # if your python version < 3.7 use the below one
 # from contextlib import suppress as nullcontext
@@ -27,7 +29,7 @@ class Executor:
         self.step = 0
 
     def train(self, model, optimizer, scheduler, data_loader, device, writer,
-              args, scaler):
+              args, scaler, epoch, model_dir, keep_last_k, save_every_n=-1):
         ''' Train one epoch
         '''
         model.train()
@@ -117,6 +119,19 @@ class Executor:
                             log_str += '{} {:.6f} '.format(name, value.item())
                     log_str += 'lr {:.8f} rank {}'.format(lr, rank)
                     logging.debug(log_str)
+                    
+                if rank == 0 and save_every_n > 0:
+                    if batch_idx % save_every_n == 0 and batch_idx != 0:
+                        save_model_path = os.path.join(model_dir, 'checkpoint-{:05d}-{:09d}.pt'.format(epoch, batch_idx))
+                        save_checkpoint(
+                            model, save_model_path, {
+                                'epoch': epoch,
+                                'lr': lr,
+                                'cv_loss': 0.0,
+                                'step': self.step
+                            })
+                        logging.debug("Save checkpoint with {} to {}".format(batch_idx, save_model_path))
+                        remove_checkpoint(model_dir, keep_last_k)
 
     def cv(self, model, data_loader, device, args):
         ''' Cross validation on
