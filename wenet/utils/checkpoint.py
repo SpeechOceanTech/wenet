@@ -40,13 +40,10 @@ def load_checkpoint(model: torch.nn.Module, path: str) -> dict:
         if name in checkpoint.keys():
             pre_params = checkpoint[name]
             if params.size() == pre_params.size():
-                print(f"loading from pretrianed models.")
                 load_state_dict[name] = pre_params
             else:
-                logging.info(f"{name} not in pretrianed models.")
                 load_state_dict[name] = params
         else:
-            print(f"{name} not in pretrianed models.")
             load_state_dict[name] = params
     model.load_state_dict(load_state_dict)
     
