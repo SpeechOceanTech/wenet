@@ -8,9 +8,17 @@ import (
 )
 
 /*
-	#include "model.h"
+#cgo CFLAGS:
+#cgo LDFLAGS: -lmodel
+#include "model.h"
 */
 import "C"
+
+type DecodeResult struct {
+	transcript string
+	duration   int
+	decodeTime int
+}
 
 func healthHandler(c *gin.Context) {
 	resp := map[string]string{
@@ -43,11 +51,19 @@ func predictHandler(c *gin.Context) {
 		"model_version": "1.0",
 	}
 
-	// data := map[string]string{}
+	// 调用底层C++推理函数
+	var wav_path string = "zh-cn-demo.wav"
 
-	// 调用C++模型推理函数
-	predictResult := C.predict()
-	fmt.Println("predict return:", predictResult)
+	// 声明C语言返回类型，否则报错
+	// cannot use (_Cfunc_predict)((_Cfunc_CString)(wav_path)) (value of type _Ctype_struct___0) as type DecodeResult in assignment
+	var result C.CDecodeResult
+
+	// 需要将go语言字符串类型转换成C语言的字符串类型，否则报错。
+	// cannot use wav_path (variable of type string) as type *_Ctype_char in argument to (_Cfunc_predict)
+	result = C.predict(C.CString(wav_path))
+
+	// C.GoString()将C语言字符串转换成Go语言的字符串。
+	fmt.Println("predict result:", C.GoString(result.transcript))
 
 	c.IndentedJSON(http.StatusOK, resp)
 }

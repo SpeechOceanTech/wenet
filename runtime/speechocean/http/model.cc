@@ -20,17 +20,23 @@ DEFINE_bool(continuous_decoding, false, "continuous decoding mode");
 DEFINE_int32(thread_num, 1, "num of decode thread");
 DEFINE_int32(warmup, 0, "num of warmup decode, 0 means no warmup");
 
+typedef struct {
+  std::string transcript;
+  int duration;
+  int decode_time;
+} DecodeResult;
+
 class Model {
  public:
   Model();
   ~Model();
   int load();
-  DecoderResult predict(std::string wav_path);
+  DecodeResult predict(std::string wav_path);
 
  private:
-  DecoderResult decode(std::pair<std::string, std::string> wav);
+  DecodeResult decode(std::pair<std::string, std::string> wav);
   int decode_task(std::pair<std::string, std::string> wav,
-                  DecoderResult* deocder_result);
+                  DecodeResult* deocder_result);
 
   std::shared_ptr<wenet::DecodeOptions> decode_options = nullptr;
   std::shared_ptr<wenet::FeaturePipelineConfig> feature_config = nullptr;
@@ -38,7 +44,7 @@ class Model {
 };
 
 // Wenet核心解码函数
-DecoderResult Model::decode(std::pair<std::string, std::string> wav) {
+DecodeResult Model::decode(std::pair<std::string, std::string> wav) {
   wenet::WavReader wav_reader(wav.second);
   int num_samples = wav_reader.num_samples();
   CHECK_EQ(wav_reader.sample_rate(), FLAGS_sample_rate);
@@ -101,7 +107,7 @@ DecoderResult Model::decode(std::pair<std::string, std::string> wav) {
   //   LOG(INFO) << "Decode wav " << wav.first << " duration " << wave_dur
   //             << "ms audio token, elapse " << decode_time << "ms.";
 
-  DecoderResult result = {
+  DecodeResult result = {
     transcript : final_result,
     duration : wave_dur,
     decode_time : decode_time,
@@ -111,8 +117,8 @@ DecoderResult Model::decode(std::pair<std::string, std::string> wav) {
 }
 
 int Model::decode_task(std::pair<std::string, std::string> wav,
-                       DecoderResult* final_result) {
-  DecoderResult result;
+                       DecodeResult* final_result) {
+  DecodeResult result;
 
   result = decode(wav);
   final_result->transcript = result.transcript;
@@ -123,6 +129,7 @@ int Model::decode_task(std::pair<std::string, std::string> wav,
 }
 
 Model::Model() {
+  // TODO 初始化模型，待优化
   char* params[] = {"speechocean",
                     "--model_path",
                     "/data/yangyang/models/wenet/zh-cn/final.zip",
@@ -147,9 +154,9 @@ Model::~Model() {}
 
 int Model::load() { return 0; }
 
-DecoderResult Model::predict(std::string wav_path) {
+DecodeResult Model::predict(std::string wav_path) {
   std::thread thread;
-  DecoderResult decoder_result;
+  DecodeResult decoder_result;
   std::pair<std::string, std::string> wav = make_pair(wav_path, wav_path);
 
   thread = std::thread(&Model::decode_task, this, wav, &decoder_result);
@@ -167,9 +174,17 @@ int init() {
 
 int load() { return 0; }
 
-DecoderResult predict(std::string wav_path) {
-  DecoderResult result;
-  result = g_model->predict(wav_path);
+CDecodeResult predict(char* wav_path) {
+  DecodeResult ori_result;
+  CDecodeResult result;
+
+  std::string c_wav_path(wav_path);
+  ori_result = g_model->predict(c_wav_path);
+
+  result.transcript = ori_result.transcript.c_str();
+  result.duration = ori_result.duration;
+  result.decode_time = ori_result.decode_time;
+
   return result;
 }
 
@@ -180,7 +195,7 @@ int main(int argc, char* argv[]) {
   // 加载模型
   load();
 
-  std::string wav_path = "zh-cn-demo.wav";
+  char* wav_path = "zh-cn-demo.wav";
   // warmup
   // 根据实验结果，前两次解码时间较长，且不稳定，后续解码时间比较稳定。
   for (int i = 0; i < 3; i++) {
@@ -188,7 +203,7 @@ int main(int argc, char* argv[]) {
   }
 
   int count = 3;
-  DecoderResult result;
+  CDecodeResult result;
   for (int i = 0; i < count; i++) {
     result = predict(wav_path);
     LOG(INFO) << "Decode wav " << wav_path << " duration: " << result.duration
