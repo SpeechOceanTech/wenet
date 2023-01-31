@@ -2,15 +2,15 @@
 extern "C" {
 #endif
 
-struct DecoderResult {
-  std::string transcript;
+typedef struct {
+  const char* transcript;
   int duration;
   int decode_time;
-};
+} CDecodeResult;
 
 int init();
 int load();
-DecoderResult predict(std::string wav_path);
+CDecodeResult predict(char* wav_path);
 
 #ifdef __cplusplus
 }
