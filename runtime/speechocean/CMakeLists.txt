@@ -9,7 +9,7 @@ option(BUILD_TESTING "whether to build unit test" ON)
 option(GRPC "whether to build with gRPC" OFF)
 # TODO(Binbin Zhang): Change websocket to OFF since it depends on boost
 #                     which is a very big library
-option(WEBSOCKET "whether to build with websocket" ON)
+option(WEBSOCKET "whether to build with websocket" OFF)
 option(TORCH "whether to build with Torch" ON)
 option(ONNX "whether to build with ONNX" OFF)
 option(GPU "whether to build with GPU" OFF)
@@ -66,6 +66,7 @@ endif()
 
 # Build all bins
 add_subdirectory(bin)
+add_subdirectory(http)
 
 # Unit Test
 if(BUILD_TESTING)

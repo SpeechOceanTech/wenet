@@ -2,8 +2,9 @@
 extern "C" {
 #endif
 
-int load(void);
-int predict(void);
+int init();
+int load();
+int predict();
 
 #ifdef __cplusplus
 }

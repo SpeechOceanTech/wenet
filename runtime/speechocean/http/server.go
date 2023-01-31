@@ -43,6 +43,8 @@ func predictHandler(c *gin.Context) {
 		"model_version": "1.0",
 	}
 
+	// data := map[string]string{}
+
 	// 调用C++模型推理函数
 	predictResult := C.predict()
 	fmt.Println("predict return:", predictResult)
@@ -52,6 +54,10 @@ func predictHandler(c *gin.Context) {
 
 func main() {
 	fmt.Println("Running model server")
+
+	// 调用底层C++代码，初始化、并加载模型
+	C.init()
+	C.load()
 
 	router := gin.Default()
 
