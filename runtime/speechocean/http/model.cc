@@ -29,7 +29,7 @@ int g_total_waves_dur = 0;
 int g_total_decode_time = 0;
 
 struct DecoderResult {
-  std::string result;
+  std::string transcript;
   int duration;
   int decode_time;
 };
@@ -99,12 +99,24 @@ DecoderResult decode(std::pair<std::string, std::string> wav) {
             << "ms audio token, elapse " << decode_time << "ms.";
 
   DecoderResult result = {
-    result : final_result,
+    transcript : final_result,
     duration : wave_dur,
     decode_time : decode_time,
   };
 
   return result;
+}
+
+int decode_task(std::pair<std::string, std::string> wav,
+                DecoderResult* final_result) {
+  DecoderResult result;
+
+  result = decode(wav);
+  final_result->transcript = result.transcript;
+  final_result->duration = result.duration;
+  final_result->decode_time = result.decode_time;
+
+  return 0;
 }
 
 class Model {
@@ -156,12 +168,19 @@ int main(int argc, char* argv[]) {
   DecoderResult decode_result;
   int total_decode_time = 0;
 
-  for (int i = 0; i < 10; i++) {
-    decode_result = decode(wav);
-    total_decode_time += decode_result.decode_time;
+  int thread_num = 6;
+  std::thread threads[thread_num];
+  DecoderResult decoder_results[thread_num];
+
+  for (int i = 0; i < thread_num; i++) {
+    threads[i] = std::thread(decode_task, wav, &decoder_results[i]);
+  }
+
+  for (int i = 0; i < thread_num; i++) {
+    threads[i].join();
   }
 
   LOG(INFO) << "Decode average time " << total_decode_time / 10 << "ms";
-  LOG(INFO) << "Decode wav " << wav.first << "result " << decode_result.result
-            << std::endl;
+  LOG(INFO) << "Decode wav " << wav.first << "result "
+            << decode_result.transcript << std::endl;
 }
