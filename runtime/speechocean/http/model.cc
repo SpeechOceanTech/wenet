@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <boost/shared_ptr.hpp>
 #include <iostream>
 
@@ -19,34 +20,36 @@ DEFINE_bool(continuous_decoding, false, "continuous decoding mode");
 DEFINE_int32(thread_num, 1, "num of decode thread");
 DEFINE_int32(warmup, 0, "num of warmup decode, 0 means no warmup");
 
-std::shared_ptr<wenet::DecodeOptions> g_decode_config;
-std::shared_ptr<wenet::FeaturePipelineConfig> g_feature_config;
-std::shared_ptr<wenet::DecodeResource> g_decode_resource;
+class Model {
+ public:
+  Model();
+  ~Model();
+  int load();
+  DecoderResult predict(std::string wav_path);
 
-std::ofstream g_result;
-std::mutex g_mutex;
-int g_total_waves_dur = 0;
-int g_total_decode_time = 0;
+ private:
+  DecoderResult decode(std::pair<std::string, std::string> wav);
+  int decode_task(std::pair<std::string, std::string> wav,
+                  DecoderResult* deocder_result);
 
-struct DecoderResult {
-  std::string transcript;
-  int duration;
-  int decode_time;
+  std::shared_ptr<wenet::DecodeOptions> decode_options = nullptr;
+  std::shared_ptr<wenet::FeaturePipelineConfig> feature_config = nullptr;
+  std::shared_ptr<wenet::DecodeResource> decode_resource = nullptr;
 };
 
-DecoderResult decode(std::pair<std::string, std::string> wav) {
+// Wenet核心解码函数
+DecoderResult Model::decode(std::pair<std::string, std::string> wav) {
   wenet::WavReader wav_reader(wav.second);
   int num_samples = wav_reader.num_samples();
   CHECK_EQ(wav_reader.sample_rate(), FLAGS_sample_rate);
 
   auto feature_pipeline =
-      std::make_shared<wenet::FeaturePipeline>(*g_feature_config);
+      std::make_shared<wenet::FeaturePipeline>(*feature_config);
   feature_pipeline->AcceptWaveform(wav_reader.data(), num_samples);
   feature_pipeline->set_input_finished();
   LOG(INFO) << "num frames " << feature_pipeline->num_frames();
 
-  wenet::AsrDecoder decoder(feature_pipeline, g_decode_resource,
-                            *g_decode_config);
+  wenet::AsrDecoder decoder(feature_pipeline, decode_resource, *decode_options);
 
   int wave_dur = static_cast<int>(static_cast<float>(num_samples) /
                                   wav_reader.sample_rate() * 1000);
@@ -62,7 +65,7 @@ DecoderResult decode(std::pair<std::string, std::string> wav) {
     int chunk_decode_time = timer.Elapsed();
     decode_time += chunk_decode_time;
     if (decoder.DecodedSomething()) {
-      LOG(INFO) << "Partial result: " << decoder.result()[0].sentence;
+      //   LOG(INFO) << "Partial result: " << decoder.result()[0].sentence;
     }
 
     if (FLAGS_continuous_decoding && state == wenet::DecodeState::kEndpoint) {
@@ -79,7 +82,7 @@ DecoderResult decode(std::pair<std::string, std::string> wav) {
       break;
     } else if (FLAGS_chunk_size > 0 && FLAGS_simulate_streaming) {
       float frame_shift_in_ms =
-          static_cast<float>(g_feature_config->frame_shift) /
+          static_cast<float>(feature_config->frame_shift) /
           wav_reader.sample_rate() * 1000;
       auto wait_time =
           decoder.num_frames_in_current_chunk() * frame_shift_in_ms -
@@ -95,8 +98,8 @@ DecoderResult decode(std::pair<std::string, std::string> wav) {
     final_result.append(decoder.result()[0].sentence);
   }
 
-  LOG(INFO) << "Decode wav " << wav.first << " duration " << wave_dur
-            << "ms audio token, elapse " << decode_time << "ms.";
+  //   LOG(INFO) << "Decode wav " << wav.first << " duration " << wave_dur
+  //             << "ms audio token, elapse " << decode_time << "ms.";
 
   DecoderResult result = {
     transcript : final_result,
@@ -107,8 +110,8 @@ DecoderResult decode(std::pair<std::string, std::string> wav) {
   return result;
 }
 
-int decode_task(std::pair<std::string, std::string> wav,
-                DecoderResult* final_result) {
+int Model::decode_task(std::pair<std::string, std::string> wav,
+                       DecoderResult* final_result) {
   DecoderResult result;
 
   result = decode(wav);
@@ -119,68 +122,79 @@ int decode_task(std::pair<std::string, std::string> wav,
   return 0;
 }
 
-class Model {
- public:
-  Model();
-  ~Model();
-  int load();
-  int predict();
+Model::Model() {
+  char* params[] = {"speechocean",
+                    "--model_path",
+                    "/data/yangyang/models/wenet/zh-cn/final.zip",
+                    "--unit_path",
+                    "/data/yangyang/models/wenet/zh-cn/words.txt",
+                    "--chunk_size",
+                    "-1",
+                    "--op_thread_num",
+                    "12"};
+  char** argv = params;
+  int argc = 9;
 
- private:
-  void* config;
-};
+  gflags::ParseCommandLineFlags(&argc, &argv, false);
+  google::InitGoogleLogging("speechocean");
 
-Model::Model() {}
+  decode_options = wenet::InitDecodeOptionsFromFlags();
+  feature_config = wenet::InitFeaturePipelineConfigFromFlags();
+  decode_resource = wenet::InitDecodeResourceFromFlags();
+}
+
 Model::~Model() {}
+
 int Model::load() { return 0; }
-int Model::predict() { return 0; }
+
+DecoderResult Model::predict(std::string wav_path) {
+  std::thread thread;
+  DecoderResult decoder_result;
+  std::pair<std::string, std::string> wav = make_pair(wav_path, wav_path);
+
+  thread = std::thread(&Model::decode_task, this, wav, &decoder_result);
+  thread.join();
+
+  return decoder_result;
+}
 
 std::shared_ptr<Model> g_model;
 
-int init() { return 0; }
+int init() {
+  g_model = std::make_shared<Model>();
+  return 0;
+}
 
 int load() { return 0; }
 
-int predict() { return 0; }
+DecoderResult predict(std::string wav_path) {
+  DecoderResult result;
+  result = g_model->predict(wav_path);
+  return result;
+}
 
 int main(int argc, char* argv[]) {
-  gflags::ParseCommandLineFlags(&argc, &argv, false);
-  google::InitGoogleLogging(argv[0]);
+  // 初始化
+  init();
 
-  g_decode_config = wenet::InitDecodeOptionsFromFlags();
-  g_feature_config = wenet::InitFeaturePipelineConfigFromFlags();
-  g_decode_resource = wenet::InitDecodeResourceFromFlags();
+  // 加载模型
+  load();
 
-  if (FLAGS_wav_path.empty()) {
-    LOG(FATAL) << "Please provide the wave path or the wav scp!";
-  }
-
-  std::string result;
-  std::pair<std::string, std::string> wav =
-      make_pair(FLAGS_wav_path, FLAGS_wav_path);
-
+  std::string wav_path = "zh-cn-demo.wav";
   // warmup
   // 根据实验结果，前两次解码时间较长，且不稳定，后续解码时间比较稳定。
   for (int i = 0; i < 3; i++) {
-    decode(wav);
+    predict(wav_path);
   }
 
-  DecoderResult decode_result;
-  int total_decode_time = 0;
-
-  int thread_num = 6;
-  std::thread threads[thread_num];
-  DecoderResult decoder_results[thread_num];
-
-  for (int i = 0; i < thread_num; i++) {
-    threads[i] = std::thread(decode_task, wav, &decoder_results[i]);
+  int count = 3;
+  DecoderResult result;
+  for (int i = 0; i < count; i++) {
+    result = predict(wav_path);
+    LOG(INFO) << "Decode wav " << wav_path << " duration: " << result.duration
+              << " transcript: " << result.transcript << ", elpase "
+              << result.decode_time << "ms";
   }
 
-  for (int i = 0; i < thread_num; i++) {
-    threads[i].join();
-  }
-
-  LOG(INFO) << "Decode average time " << total_decode_time / 10 << "ms";
-  LOG(INFO) << "Decode wav " << wav.first << "result "
-            << decode_result.transcript << std::endl;
+  return 0;
 }
