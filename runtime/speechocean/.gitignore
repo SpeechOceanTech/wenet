@@ -2,3 +2,4 @@ fc_base
 build
 http/model-server
 http/*.so
+http/*.wav

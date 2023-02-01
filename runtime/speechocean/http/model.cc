@@ -28,7 +28,8 @@ typedef struct {
 
 class Model {
  public:
-  Model();
+  Model(std::string model_name, std::string model_verion,
+        std::string model_path);
   ~Model();
   int load();
   DecodeResult predict(std::string wav_path);
@@ -37,6 +38,10 @@ class Model {
   DecodeResult decode(std::pair<std::string, std::string> wav);
   int decode_task(std::pair<std::string, std::string> wav,
                   DecodeResult* deocder_result);
+
+  std::string model_name;
+  std::string model_version;
+  std::string model_path;
 
   std::shared_ptr<wenet::DecodeOptions> decode_options = nullptr;
   std::shared_ptr<wenet::FeaturePipelineConfig> feature_config = nullptr;
@@ -128,19 +133,31 @@ int Model::decode_task(std::pair<std::string, std::string> wav,
   return 0;
 }
 
-Model::Model() {
-  // TODO 初始化模型，待优化
-  char* params[] = {"speechocean",
-                    "--model_path",
-                    "/data/yangyang/models/wenet/zh-cn/final.zip",
-                    "--unit_path",
-                    "/data/yangyang/models/wenet/zh-cn/words.txt",
-                    "--chunk_size",
-                    "-1",
-                    "--op_thread_num",
-                    "12"};
-  char** argv = params;
-  int argc = 9;
+Model::Model(std::string model_name, std::string model_version,
+             std::string model_path)
+    : model_name(model_name),
+      model_version(model_version),
+      model_path(model_path) {
+  std::vector<std::string> cmd_argv;
+  cmd_argv.push_back(std::string("speechocean"));
+  cmd_argv.push_back(std::string("--model_path"));
+  cmd_argv.push_back(model_path + std::string("final.zip"));
+  cmd_argv.push_back(std::string("--unit_path"));
+  cmd_argv.push_back(model_path + std::string("/words.txt"));
+  cmd_argv.push_back(std::string("--chunk_size"));
+  cmd_argv.push_back(std::string("-1"));
+  cmd_argv.push_back(std::string("--op_thread_num"));
+  cmd_argv.push_back(std::string("8"));
+
+  int argc = static_cast<int>(cmd_argv.size());
+  char** argv = new char*[argc + 1];
+
+  for (int i = 0; i < argc; i++) {
+    int length = static_cast<int>(cmd_argv[i].size());
+    argv[i] = new char[length + 1];
+    strncpy(argv[i], cmd_argv[i].c_str(), length);
+    argv[i][length] = '\0';
+  }
 
   gflags::ParseCommandLineFlags(&argc, &argv, false);
   google::InitGoogleLogging("speechocean");
@@ -159,6 +176,9 @@ DecodeResult Model::predict(std::string wav_path) {
   DecodeResult decoder_result;
   std::pair<std::string, std::string> wav = make_pair(wav_path, wav_path);
 
+  // 线程函数通过传入decoder_result指针得到解码结果；
+  // 传入Model::decode_task函数指针，修复invalid use of non-static member
+  // function报错
   thread = std::thread(&Model::decode_task, this, wav, &decoder_result);
   thread.join();
 
@@ -167,14 +187,15 @@ DecodeResult Model::predict(std::string wav_path) {
 
 std::shared_ptr<Model> g_model;
 
-int init() {
-  g_model = std::make_shared<Model>();
+int model_load(const char* model_name, const char* model_version,
+               const char* model_path) {
+  g_model = std::make_shared<Model>(std::string(model_name),
+                                    std::string(model_version),
+                                    std::string(model_path));
   return 0;
 }
 
-int load() { return 0; }
-
-CDecodeResult predict(char* wav_path) {
+CDecodeResult model_predict(const char* wav_path) {
   DecodeResult ori_result;
   CDecodeResult result;
 
@@ -189,23 +210,24 @@ CDecodeResult predict(char* wav_path) {
 }
 
 int main(int argc, char* argv[]) {
-  // 初始化
-  init();
+  const char* model_name = "wenet";
+  const char* model_version = "v1";
+  const char* model_path = "/data/yangyang/models/wenet/zh-cn/";
 
   // 加载模型
-  load();
+  model_load(model_name, model_version, model_path);
 
-  char* wav_path = "zh-cn-demo.wav";
+  const char* wav_path = "zh-cn-demo.wav";
   // warmup
   // 根据实验结果，前两次解码时间较长，且不稳定，后续解码时间比较稳定。
   for (int i = 0; i < 3; i++) {
-    predict(wav_path);
+    model_predict(wav_path);
   }
 
   int count = 3;
   CDecodeResult result;
   for (int i = 0; i < count; i++) {
-    result = predict(wav_path);
+    result = model_predict(wav_path);
     LOG(INFO) << "Decode wav " << wav_path << " duration: " << result.duration
               << " transcript: " << result.transcript << ", elpase "
               << result.decode_time << "ms";

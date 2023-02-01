@@ -8,9 +8,9 @@ typedef struct {
   int decode_time;
 } CDecodeResult;
 
-int init();
-int load();
-CDecodeResult predict(char* wav_path);
+int model_load(const char* model_name, const char* model_version,
+               const char* model_path);
+CDecodeResult model_predict(const char* wav_path);
 
 #ifdef __cplusplus
 }
