@@ -13,6 +13,8 @@ option(WEBSOCKET "whether to build with websocket" OFF)
 option(TORCH "whether to build with Torch" ON)
 option(ONNX "whether to build with ONNX" OFF)
 option(GPU "whether to build with GPU" OFF)
+option(WENET_BIN "whether to build wenet bin" OFF)
+option(WENET_LIB "where to build wenet library" OFF)
 
 set(CMAKE_VERBOSE_MAKEFILE OFF)
 
