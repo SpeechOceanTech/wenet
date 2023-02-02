@@ -8,9 +8,19 @@ typedef struct {
   int decode_time;
 } CDecodeResult;
 
+typedef struct {
+  const char* wav_path;
+} ModelRequest;
+
+typedef struct {
+  const char* transcript;
+  int duration;
+  int decode_time;
+} ModelResponse;
+
 int model_load(const char* model_name, const char* model_version,
                const char* model_path);
-CDecodeResult model_predict(const char* wav_path);
+ModelResponse model_predict(ModelRequest request);
 
 #ifdef __cplusplus
 }

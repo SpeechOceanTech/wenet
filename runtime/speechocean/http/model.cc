@@ -26,18 +26,26 @@ typedef struct {
   int decode_time;
 } DecodeResult;
 
+typedef struct {
+  std::string sentence;
+  int duration;
+  int decode_time;
+
+  std::vector<wenet::DecodeResult> decode_results;
+} FinalDecodeResult;
+
 class Model {
  public:
   Model(std::string model_name, std::string model_verion,
         std::string model_path);
   ~Model();
   int load();
-  DecodeResult predict(std::string wav_path);
+  FinalDecodeResult predict(std::string wav_path);
 
  private:
-  DecodeResult decode(std::pair<std::string, std::string> wav);
+  FinalDecodeResult decode(std::pair<std::string, std::string> wav);
   int decode_task(std::pair<std::string, std::string> wav,
-                  DecodeResult* deocder_result);
+                  FinalDecodeResult* deocder_result);
 
   std::string model_name;
   std::string model_version;
@@ -49,7 +57,8 @@ class Model {
 };
 
 // Wenet核心解码函数
-DecodeResult Model::decode(std::pair<std::string, std::string> wav) {
+FinalDecodeResult Model::decode(std::pair<std::string, std::string> wav) {
+  FinalDecodeResult final_decode_result;
   wenet::WavReader wav_reader(wav.second);
   int num_samples = wav_reader.num_samples();
   CHECK_EQ(wav_reader.sample_rate(), FLAGS_sample_rate);
@@ -66,7 +75,7 @@ DecodeResult Model::decode(std::pair<std::string, std::string> wav) {
                                   wav_reader.sample_rate() * 1000);
 
   int decode_time = 0;
-  std::string final_result;
+  //   std::string final_result;
   while (true) {
     wenet::Timer timer;
     wenet::DecodeState state = decoder.Decode();
@@ -84,7 +93,11 @@ DecodeResult Model::decode(std::pair<std::string, std::string> wav) {
         decoder.Rescoring();
         LOG(INFO) << "Final result (continuous decoding): "
                   << decoder.result()[0].sentence;
-        final_result.append(decoder.result()[0].sentence);
+
+        for (int i = 0; i < decoder.result().size(); i++) {
+          //   final_decode_result.decode_results.emplace_back(decoder.result()[i]);
+        }
+        // final_result.append(decoder.result()[0].sentence);
       }
       decoder.ResetContinuousDecoding();
     }
@@ -106,27 +119,33 @@ DecodeResult Model::decode(std::pair<std::string, std::string> wav) {
     }
   }
   if (decoder.DecodedSomething()) {
-    final_result.append(decoder.result()[0].sentence);
+    for (int i = 0; i < decoder.result().size(); i++) {
+      final_decode_result.decode_results.emplace_back(decoder.result()[i]);
+    }
+
+    // final_result.append(decoder.result()[0].sentence);
   }
 
   //   LOG(INFO) << "Decode wav " << wav.first << " duration " << wave_dur
   //             << "ms audio token, elapse " << decode_time << "ms.";
 
-  DecodeResult result = {
-    transcript : final_result,
-    duration : wave_dur,
-    decode_time : decode_time,
-  };
+  final_decode_result.sentence = final_decode_result.decode_results[0].sentence;
 
-  return result;
+  final_decode_result.duration = wave_dur;
+  final_decode_result.decode_time = decode_time;
+  return final_decode_result;
 }
 
 int Model::decode_task(std::pair<std::string, std::string> wav,
-                       DecodeResult* final_result) {
-  DecodeResult result;
+                       FinalDecodeResult* final_result) {
+  FinalDecodeResult result;
 
   result = decode(wav);
-  final_result->transcript = result.transcript;
+
+  for (int i = 0; i < result.decode_results.size(); i++) {
+    final_result->decode_results.emplace_back(result.decode_results[i]);
+  }
+  final_result->sentence = result.sentence;
   final_result->duration = result.duration;
   final_result->decode_time = result.decode_time;
 
@@ -171,18 +190,18 @@ Model::~Model() {}
 
 int Model::load() { return 0; }
 
-DecodeResult Model::predict(std::string wav_path) {
+FinalDecodeResult Model::predict(std::string wav_path) {
   std::thread thread;
-  DecodeResult decoder_result;
+  FinalDecodeResult final_result;
   std::pair<std::string, std::string> wav = make_pair(wav_path, wav_path);
 
   // 线程函数通过传入decoder_result指针得到解码结果；
   // 传入Model::decode_task函数指针，修复invalid use of non-static member
   // function报错
-  thread = std::thread(&Model::decode_task, this, wav, &decoder_result);
+  thread = std::thread(&Model::decode_task, this, wav, &final_result);
   thread.join();
 
-  return decoder_result;
+  return final_result;
 }
 
 std::shared_ptr<Model> g_model;
@@ -195,18 +214,18 @@ int model_load(const char* model_name, const char* model_version,
   return 0;
 }
 
-CDecodeResult model_predict(const char* wav_path) {
-  DecodeResult ori_result;
-  CDecodeResult result;
+ModelResponse model_predict(ModelRequest request) {
+  FinalDecodeResult result;
+  ModelResponse response;
 
-  std::string c_wav_path(wav_path);
-  ori_result = g_model->predict(c_wav_path);
+  std::string wav_path(request.wav_path);
+  result = g_model->predict(wav_path);
 
-  result.transcript = ori_result.transcript.c_str();
-  result.duration = ori_result.duration;
-  result.decode_time = ori_result.decode_time;
+  response.transcript = result.sentence.c_str();
+  response.duration = result.duration;
+  response.decode_time = result.decode_time;
 
-  return result;
+  return response;
 }
 
 int main(int argc, char* argv[]) {
@@ -217,20 +236,22 @@ int main(int argc, char* argv[]) {
   // 加载模型
   model_load(model_name, model_version, model_path);
 
-  const char* wav_path = "zh-cn-demo.wav";
+  ModelRequest request;
+  request.wav_path = "zh-cn-demo.wav";
   // warmup
   // 根据实验结果，前两次解码时间较长，且不稳定，后续解码时间比较稳定。
   for (int i = 0; i < 3; i++) {
-    model_predict(wav_path);
+    model_predict(request);
   }
 
   int count = 3;
-  CDecodeResult result;
+  ModelResponse response;
   for (int i = 0; i < count; i++) {
-    result = model_predict(wav_path);
-    LOG(INFO) << "Decode wav " << wav_path << " duration: " << result.duration
-              << " transcript: " << result.transcript << ", elpase "
-              << result.decode_time << "ms";
+    response = model_predict(request);
+    LOG(INFO) << "Decode wav " << request.wav_path
+              << " duration: " << response.duration
+              << " transcript: " << response.transcript << ", elpase "
+              << response.decode_time << "ms";
   }
 
   return 0;
