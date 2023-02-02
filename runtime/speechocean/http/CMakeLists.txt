@@ -2,10 +2,8 @@
 if (WENET_BIN)
   add_executable(wenet-runtime model.cc)
   target_link_libraries(wenet-runtime PUBLIC decoder)
-endif()
-
-# 编译成动态库，便于go集成
-if (WENET_LIB)
+elseif (WENET_LIB)
+  # 编译成动态库，便于go集成
   add_library(wenet SHARED model.cc)
   target_link_libraries(wenet PUBLIC decoder)
 endif()
