@@ -21,12 +21,6 @@ DEFINE_int32(thread_num, 1, "num of decode thread");
 DEFINE_int32(warmup, 0, "num of warmup decode, 0 means no warmup");
 
 typedef struct {
-  std::string transcript;
-  int duration;
-  int decode_time;
-} DecodeResult;
-
-typedef struct {
   std::string sentence;
   int duration;
   int decode_time;
@@ -157,6 +151,7 @@ Model::Model(std::string model_name, std::string model_version,
     : model_name(model_name),
       model_version(model_version),
       model_path(model_path) {
+#ifdef WENET_LIB
   std::vector<std::string> cmd_argv;
   cmd_argv.push_back(std::string("speechocean"));
   cmd_argv.push_back(std::string("--model_path"));
@@ -179,16 +174,21 @@ Model::Model(std::string model_name, std::string model_version,
   }
 
   gflags::ParseCommandLineFlags(&argc, &argv, false);
-  google::InitGoogleLogging("speechocean");
+  google::InitGoogleLogging(argv[0]);
+#endif
 
-  decode_options = wenet::InitDecodeOptionsFromFlags();
-  feature_config = wenet::InitFeaturePipelineConfigFromFlags();
-  decode_resource = wenet::InitDecodeResourceFromFlags();
+  load();
 }
 
 Model::~Model() {}
 
-int Model::load() { return 0; }
+int Model::load() {
+  decode_options = wenet::InitDecodeOptionsFromFlags();
+  feature_config = wenet::InitFeaturePipelineConfigFromFlags();
+  decode_resource = wenet::InitDecodeResourceFromFlags();
+
+  return 0;
+}
 
 FinalDecodeResult Model::predict(std::string wav_path) {
   std::thread thread;
@@ -221,7 +221,7 @@ ModelResponse model_predict(ModelRequest request) {
   std::string wav_path(request.wav_path);
   result = g_model->predict(wav_path);
 
-  response.transcript = result.sentence.c_str();
+  response.text = result.sentence.c_str();
   response.duration = result.duration;
   response.decode_time = result.decode_time;
 
@@ -231,10 +231,18 @@ ModelResponse model_predict(ModelRequest request) {
 int main(int argc, char* argv[]) {
   const char* model_name = "wenet";
   const char* model_version = "v1";
-  const char* model_path = "/data/yangyang/models/wenet/zh-cn/";
+
+  gflags::ParseCommandLineFlags(&argc, &argv, false);
+  google::InitGoogleLogging(argv[0]);
+
+  if (FLAGS_wav_path.empty()) {
+    LOG(FATAL) << "Please provide the wave path.";
+  }
+
+  std::string model_path = FLAGS_wav_path;
 
   // 加载模型
-  model_load(model_name, model_version, model_path);
+  model_load(model_name, model_version, model_path.c_str());
 
   ModelRequest request;
   request.wav_path = "zh-cn-demo.wav";
@@ -250,7 +258,7 @@ int main(int argc, char* argv[]) {
     response = model_predict(request);
     LOG(INFO) << "Decode wav " << request.wav_path
               << " duration: " << response.duration
-              << " transcript: " << response.transcript << ", elpase "
+              << " transcript: " << response.text << ", elpase "
               << response.decode_time << "ms";
   }
 

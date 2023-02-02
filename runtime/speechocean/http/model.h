@@ -3,17 +3,11 @@ extern "C" {
 #endif
 
 typedef struct {
-  const char* transcript;
-  int duration;
-  int decode_time;
-} CDecodeResult;
-
-typedef struct {
   const char* wav_path;
 } ModelRequest;
 
 typedef struct {
-  const char* transcript;
+  const char* text;
   int duration;
   int decode_time;
 } ModelResponse;
