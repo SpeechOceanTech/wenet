@@ -68,7 +68,7 @@ endif()
 
 # Build all bins
 add_subdirectory(bin)
-add_subdirectory(http)
+add_subdirectory(server/libwenet)
 
 # Unit Test
 if(BUILD_TESTING)

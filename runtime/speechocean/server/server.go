@@ -1,15 +1,18 @@
 package main
 
 import (
+	"flag"
 	"fmt"
+	"log"
 	"net/http"
+	"os"
 
 	"github.com/gin-gonic/gin"
 )
 
 /*
-#cgo CFLAGS:
-#cgo LDFLAGS: -lmodel
+#cgo CFLAGS: -I libwenet
+#cgo LDFLAGS: -lwenet
 #include "model.h"
 */
 import "C"
@@ -54,16 +57,18 @@ func predictHandler(c *gin.Context) {
 	// 调用底层C++推理函数
 	var wav_path string = "zh-cn-demo.wav"
 
-	// 声明C语言返回类型，否则报错
-	// cannot use (_Cfunc_predict)((_Cfunc_CString)(wav_path)) (value of type _Ctype_struct___0) as type DecodeResult in assignment
-	var result C.CDecodeResult
+	var modelRequest C.ModelRequest
+	var modelResponse C.ModelResponse
+
+	modelRequest.wav_path = C.CString(wav_path)
 
 	// 需要将go语言字符串类型转换成C语言的字符串类型，否则报错。
 	// cannot use wav_path (variable of type string) as type *_Ctype_char in argument to (_Cfunc_predict)
-	result = C.predict(C.CString(wav_path))
+	modelResponse = C.model_predict(modelRequest)
 
 	// C.GoString()将C语言字符串转换成Go语言的字符串。
-	fmt.Println("predict result:", C.GoString(result.transcript))
+	fmt.Println("predict result:", C.GoString(modelResponse.text))
+	resp["text"] = C.GoString(modelResponse.text)
 
 	c.IndentedJSON(http.StatusOK, resp)
 }
@@ -71,9 +76,22 @@ func predictHandler(c *gin.Context) {
 func main() {
 	fmt.Println("Running model server")
 
+	modelName := flag.String("model_name", "wenet", "model name")
+	modelVersion := flag.String("model_version", "1.0", "model version")
+	modelPath := flag.String("model_path", "", "model path")
+
+	flag.Parse()
+
+	// 检查模型目录是否存在
+	_, err := os.Stat(*modelPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			log.Fatal("model path not exist!")
+		}
+	}
+
 	// 调用底层C++代码，初始化、并加载模型
-	C.init()
-	C.load()
+	C.model_load(C.CString(*modelName), C.CString(*modelVersion), C.CString(*modelPath))
 
 	router := gin.Default()
 

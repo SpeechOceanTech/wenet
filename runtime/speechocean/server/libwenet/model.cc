@@ -143,6 +143,10 @@ int Model::decode_task(std::pair<std::string, std::string> wav,
   final_result->duration = result.duration;
   final_result->decode_time = result.decode_time;
 
+  LOG(INFO) << "Decode sentence: " << final_result->sentence
+            << ", duration: " << final_result->duration
+            << "ms, elpase: " << final_result->decode_time << "ms";
+
   return 0;
 }
 
@@ -157,7 +161,7 @@ Model::Model(std::string model_name, std::string model_version,
   cmd_argv.push_back(std::string("--model_path"));
   cmd_argv.push_back(model_path + std::string("final.zip"));
   cmd_argv.push_back(std::string("--unit_path"));
-  cmd_argv.push_back(model_path + std::string("/words.txt"));
+  cmd_argv.push_back(model_path + std::string("words.txt"));
   cmd_argv.push_back(std::string("--chunk_size"));
   cmd_argv.push_back(std::string("-1"));
   cmd_argv.push_back(std::string("--op_thread_num"));
@@ -236,7 +240,7 @@ int main(int argc, char* argv[]) {
   google::InitGoogleLogging(argv[0]);
 
   if (FLAGS_wav_path.empty()) {
-    LOG(FATAL) << "Please provide the wave path.";
+    LOG(FATAL) << "Please provide the wav path";
   }
 
   std::string model_path = FLAGS_wav_path;
