@@ -2,6 +2,8 @@ from ubuntu:20.04
 
 WORKDIR /opt/wenet
 
+CMD mkdir /data/models
+
 ARG LIB_DIR=/lib/
 COPY fc_base/libtorch-src/lib/libtorch_cpu.so $LIB_DIR
 COPY fc_base/libtorch-src/lib/libtorch.so $LIB_DIR
@@ -11,4 +13,4 @@ COPY build/server/libwenet/libwenet.so $LIB_DIR
 
 COPY server/model-server bin/
 
-CMD ["bin/model-server"]
+ENTRYPOINT ["bin/model-server"]
