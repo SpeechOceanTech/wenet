@@ -26,8 +26,8 @@ var tmpFileDir string = "/tmp/model-server"
 type ModelInput map[string]string
 
 type ModelPredictRequest struct {
-	Parameters map[string]interface{} `json:parameters`
-	Inputs     []ModelInput           `json:inputs`
+	Parameters map[string]interface{} `json:"parameters"`
+	Inputs     []ModelInput           `json:"inputs"`
 }
 
 type ModelPredictRespnose struct {
@@ -138,9 +138,11 @@ func predictHandler(c *gin.Context) {
 	modelResponse = C.model_predict(modelRequest)
 
 	// C.GoString()将C语言字符串转换成Go语言的字符串。
-	fmt.Println("predict result:", C.GoString(modelResponse.text))
-	resp["text"] = C.GoString(modelResponse.text)
+	fmt.Println("model response, text:", C.GoString(modelResponse.text),
+		", decode_time: ", modelResponse.decode_time,
+		"ms, duration: ", modelResponse.duration, "ms")
 
+	resp["text"] = C.GoString(modelResponse.text)
 	c.JSON(http.StatusOK, resp)
 }
 
