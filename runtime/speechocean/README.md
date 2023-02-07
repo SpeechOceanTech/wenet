@@ -118,9 +118,9 @@ curl localhost:8080/infer -d '{"inputs":[{"wav_path": "http://so-algorithm-test.
 
 ### 镜像大小对比
 
-| Python版本 | Torch版本 | ONNX版本 |
-| ---------- | --------- | -------- |
-| 10.1GB     | 634MB     | 123MB    |
+| Python版本 | Runtime Torch版本 | Runtime ONNX版本 |
+| ---------- | ----------------- | ---------------- |
+| 10.1GB     | 634MB             | 123MB            |
 
 ONNX版本镜像主要包括：
 
