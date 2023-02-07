@@ -7,3 +7,4 @@ server/*.wav
 server/libwenet/*.so
 server/model-server
 *.so
+*.wav
