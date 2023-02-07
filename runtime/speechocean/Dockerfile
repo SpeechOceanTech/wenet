@@ -13,4 +13,7 @@ COPY build/server/libwenet/libwenet.so $LIB_DIR
 
 COPY server/model-server bin/
 
+ENV GLOG_logtostderr=1
+ENV GLOG_v=2
+
 ENTRYPOINT ["bin/model-server"]
