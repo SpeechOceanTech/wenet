@@ -118,9 +118,9 @@ curl localhost:8080/infer -d '{"inputs":[{"wav_path": "http://so-algorithm-test.
 
 ### 镜像大小对比
 
-| Python版本 | Runtime Torch版本 | Runtime ONNX版本 |
-| ---------- | ----------------- | ---------------- |
-| 10.1GB     | 634MB             | 123MB            |
+| Python ONNX版本 | Runtime Torch版本 | Runtime ONNX版本 |
+| --------------- | ----------------- | ---------------- |
+| 10.1GB          | 634MB             | 123MB            |
 
 ONNX版本镜像主要包括：
 
@@ -131,3 +131,19 @@ ONNX版本镜像主要包括：
 ### 推理速度对比
 
 TODO
+
+Python版本Runtime ONNX推理速度对比
+
+| Python版本 | Runtime ONNX版本 |
+| ---------- | ---------------- |
+|            |                  |
+
+Runtime ONNX版本量化前后RTF、WER对比
+
+| 量化    | RTF  | WER  |
+| ------- | ---- | ---- |
+| float32 |      |      |
+| int8    |      |      |
+
+> 在aishell2测试集运行结果。
+
