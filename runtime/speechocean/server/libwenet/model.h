@@ -7,7 +7,7 @@ typedef struct {
 } ModelRequest;
 
 typedef struct {
-  const char* text;
+  char* text;
   int duration;
   int decode_time;
 } ModelResponse;

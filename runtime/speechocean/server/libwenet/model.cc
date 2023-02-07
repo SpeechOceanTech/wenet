@@ -158,8 +158,13 @@ Model::Model(std::string model_name, std::string model_version,
 #ifdef WENET_LIB
   std::vector<std::string> cmd_argv;
   cmd_argv.push_back(std::string("speechocean"));
+#ifdef USE_ONNX
+  cmd_argv.push_back(std::string("--onnx_dir"));
+  cmd_argv.push_back(model_path);
+#else
   cmd_argv.push_back(std::string("--model_path"));
   cmd_argv.push_back(model_path + std::string("final.zip"));
+#endif
   cmd_argv.push_back(std::string("--unit_path"));
   cmd_argv.push_back(model_path + std::string("words.txt"));
   cmd_argv.push_back(std::string("--chunk_size"));
@@ -225,9 +230,14 @@ ModelResponse model_predict(ModelRequest request) {
   std::string wav_path(request.wav_path);
   result = g_model->predict(wav_path);
 
-  response.text = result.sentence.c_str();
+  response.text = (char*)malloc(result.sentence.size() + 1);
+  strcpy(response.text, result.sentence.c_str());
   response.duration = result.duration;
   response.decode_time = result.decode_time;
+
+  LOG(INFO) << "Model response: " << response.text
+            << ", duration: " << response.duration
+            << "ms, elpase: " << response.decode_time << "ms ";
 
   return response;
 }
@@ -240,16 +250,20 @@ int main(int argc, char* argv[]) {
   google::InitGoogleLogging(argv[0]);
 
   if (FLAGS_wav_path.empty()) {
-    LOG(FATAL) << "Please provide the wav path";
+    LOG(FATAL) << "Please provide the wav path!";
   }
 
-  std::string model_path = FLAGS_wav_path;
+  if (FLAGS_model_path.empty()) {
+    LOG(FATAL) << "Please provie the model path!";
+  }
+
+  std::string model_path = FLAGS_model_path;
 
   // 加载模型
   model_load(model_name, model_version, model_path.c_str());
 
   ModelRequest request;
-  request.wav_path = "zh-cn-demo.wav";
+  request.wav_path = FLAGS_wav_path.c_str();
   // warmup
   // 根据实验结果，前两次解码时间较长，且不稳定，后续解码时间比较稳定。
   for (int i = 0; i < 3; i++) {
