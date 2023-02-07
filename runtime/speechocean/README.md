@@ -116,7 +116,7 @@ curl localhost:8080/infer -d '{"inputs":[{"wav_path": "http://so-algorithm-test.
 
 ## Runtime和Python版本对比
 
-### 镜像大小对比
+### 镜像大小
 
 | Python ONNX版本 | Runtime Torch版本 | Runtime ONNX版本 |
 | --------------- | ----------------- | ---------------- |
@@ -128,7 +128,9 @@ ONNX版本镜像主要包括：
 - 主要的动态库，libwenet.so 大小为23M，libonnxruntime.so 大小为15M
 - 二进制文件，model-server 大小为11M
 
-### 推理速度对比
+**Runtime ONNX版本相对于Python ONNX版本镜像大小降低了90%以上。**
+
+### 推理速度
 
 TODO
 
@@ -147,3 +149,17 @@ Runtime ONNX版本量化前后RTF、WER对比
 
 > 在aishell2测试集运行结果。
 
+## Wenet Runtime的优缺点
+
+优点：
+
+- Docker镜像更小；
+- 推理速度更快；
+- 私有化交付更方便，不需要代码混淆或加密；
+
+
+
+缺点：
+
+- 相对于Python，编码效率更低；
+- 代码运行错误不易排查；
