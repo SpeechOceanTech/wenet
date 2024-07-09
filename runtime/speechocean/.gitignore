@@ -1,0 +1,10 @@
+fc_base
+build
+http/model-server
+http/*.so
+http/*.wav
+server/*.wav
+server/libwenet/*.so
+server/model-server
+*.so
+*.wav
